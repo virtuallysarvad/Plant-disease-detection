@@ -1,5 +1,5 @@
-tensorflow
+torch
+torchvision
+torchaudio
 streamlit
-numpy
-matplotlib
 pillow

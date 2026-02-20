@@ -1,71 +1,93 @@
-import tensorflow as tf
-from tensorflow.keras import layers, models
-from tensorflow.keras.applications import MobileNetV2
-import matplotlib.pyplot as plt
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision import datasets, transforms, models
+from torchvision.models import MobileNet_V2_Weights
+from torch.utils.data import DataLoader, random_split
 
-# Dataset path
-dataset_path = "dataset/color"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using device:", device)
 
-# Load dataset with train/validation split
-train_data = tf.keras.preprocessing.image_dataset_from_directory(
-    dataset_path,
-    validation_split=0.2,
-    subset="training",
-    seed=42,
-    image_size=(128, 128),
-    batch_size=32
-)
-
-val_data = tf.keras.preprocessing.image_dataset_from_directory(
-    dataset_path,
-    validation_split=0.2,
-    subset="validation",
-    seed=42,
-    image_size=(128, 128),
-    batch_size=32
-)
-
-class_names = train_data.class_names
-print("Classes:", class_names)
-
-# Prefetch for performance
-AUTOTUNE = tf.data.AUTOTUNE
-train_data = train_data.prefetch(buffer_size=AUTOTUNE)
-val_data = val_data.prefetch(buffer_size=AUTOTUNE)
-
-# Load pretrained MobileNetV2
-base_model = MobileNetV2(
-    input_shape=(128, 128, 3),
-    include_top=False,
-    weights='imagenet'
-)
-
-base_model.trainable = False
-
-# Build model
-model = models.Sequential([
-    layers.Rescaling(1./255),
-    base_model,
-    layers.GlobalAveragePooling2D(),
-    layers.Dense(128, activation='relu'),
-    layers.Dropout(0.5),
-    layers.Dense(len(class_names), activation='softmax')
+# ----------------------------
+# Transforms (IMPORTANT FIX)
+# ----------------------------
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor(),
+    transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225]
+    )
 ])
 
-model.compile(
-    optimizer='adam',
-    loss='sparse_categorical_crossentropy',
-    metrics=['accuracy']
-)
+dataset = datasets.ImageFolder("dataset/color", transform=transform)
 
-# Train model
-history = model.fit(
-    train_data,
-    validation_data=val_data,
-    epochs=5
-)
+# ----------------------------
+# Train / Validation Split
+# ----------------------------
+train_size = int(0.8 * len(dataset))
+val_size = len(dataset) - train_size
+train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
-# Save model
-model.save("plant_disease_model.h5")
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
-print("Model saved successfully!")
+num_classes = len(dataset.classes)
+
+# ----------------------------
+# Load Pretrained Model
+# ----------------------------
+model = models.mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
+
+# Freeze feature extractor
+for param in model.features.parameters():
+    param.requires_grad = False
+
+# Replace classifier
+model.classifier[1] = nn.Linear(model.last_channel, num_classes)
+
+model = model.to(device)
+
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.classifier.parameters(), lr=0.001)
+
+epochs = 15
+
+for epoch in range(epochs):
+    model.train()
+    running_loss = 0.0
+
+    for images, labels in train_loader:
+        images, labels = images.to(device), labels.to(device)
+
+        optimizer.zero_grad()
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        running_loss += loss.item()
+
+    # Validation
+    model.eval()
+    correct = 0
+    total = 0
+
+    with torch.no_grad():
+        for images, labels in val_loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
+            _, predicted = torch.max(outputs, 1)
+
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    val_accuracy = 100 * correct / total
+
+    print(f"Epoch [{epoch+1}/{epochs}], "
+          f"Loss: {running_loss/len(train_loader):.4f}, "
+          f"Val Accuracy: {val_accuracy:.2f}%")
+
+torch.save(model.state_dict(), "plant_model.pth")
+print("Model saved successfully.")
