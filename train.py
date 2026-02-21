@@ -4,6 +4,7 @@ import torch.optim as optim
 from torchvision import datasets, transforms, models
 from torchvision.models import MobileNet_V2_Weights
 from torch.utils.data import DataLoader, random_split
+import json
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
@@ -91,3 +92,8 @@ for epoch in range(epochs):
 
 torch.save(model.state_dict(), "plant_model.pth")
 print("Model saved successfully.")
+# Save class names
+with open("class_names.json", "w") as f:
+    json.dump(dataset.classes, f)
+
+print("Class names saved.")
