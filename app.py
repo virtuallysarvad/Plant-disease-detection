@@ -63,8 +63,22 @@ if uploaded_file is not None:
             probabilities = torch.softmax(outputs, dim=1)
             confidence, predicted_class = torch.max(probabilities, 1)
 
-    predicted_label = class_names[predicted_class.item()]
+    raw_label = class_names[predicted_class.item()]
+    # Clean the label (e.g., convert "Tomato___Bacterial_spot" to "Tomato Bacterial Spot")
+    clean_label = raw_label.replace("_", " ").replace("  ", " ").strip().title()
     confidence_score = confidence.item() * 100
 
-    st.success(f"Prediction: {predicted_label}")
-    st.info(f"Confidence: {confidence_score:.2f}%")
+    st.markdown("---")
+    st.subheader("🔍 Diagnostic Results")
+    
+    # Display the full condition name without truncation
+    st.markdown(f"### Detected Condition:")
+    st.markdown(f"#### <span style='color:#FF4B4B'>{clean_label}</span>" if "healthy" not in clean_label.lower() else f"#### <span style='color:#00CC96'>{clean_label}</span>", unsafe_allow_html=True)
+    
+    st.markdown(f"**Confidence Score: {confidence_score:.2f}%**")
+    st.progress(float(confidence.item()))
+    
+    if "healthy" in clean_label.lower():
+        st.success("Great news! The plant appears to be healthy. 🌱")
+    else:
+        st.error(f"Attention! The plant shows signs of **{clean_label}**. ⚠️")

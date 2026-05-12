@@ -9,9 +9,6 @@ import json
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
-# ----------------------------
-# Transforms (IMPORTANT FIX)
-# ----------------------------
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.RandomHorizontalFlip(),
@@ -24,9 +21,6 @@ transform = transforms.Compose([
 
 dataset = datasets.ImageFolder("dataset/color", transform=transform)
 
-# ----------------------------
-# Train / Validation Split
-# ----------------------------
 train_size = int(0.8 * len(dataset))
 val_size = len(dataset) - train_size
 train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
