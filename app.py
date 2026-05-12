@@ -53,7 +53,6 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="Uploaded Image", use_container_width=True)
 
     img_tensor = transform(image).unsqueeze(0).to(device)
 
@@ -69,16 +68,24 @@ if uploaded_file is not None:
     confidence_score = confidence.item() * 100
 
     st.markdown("---")
-    st.subheader("🔍 Diagnostic Results")
     
-    # Display the full condition name without truncation
-    st.markdown(f"### Detected Condition:")
-    st.markdown(f"#### <span style='color:#FF4B4B'>{clean_label}</span>" if "healthy" not in clean_label.lower() else f"#### <span style='color:#00CC96'>{clean_label}</span>", unsafe_allow_html=True)
+    # Create two columns to display image and results side-by-side
+    col1, col2 = st.columns([1, 1.5])
     
-    st.markdown(f"**Confidence Score: {confidence_score:.2f}%**")
-    st.progress(float(confidence.item()))
-    
-    if "healthy" in clean_label.lower():
-        st.success("Great news! The plant appears to be healthy. 🌱")
-    else:
-        st.error(f"Attention! The plant shows signs of **{clean_label}**. ⚠️")
+    with col1:
+        st.image(image, caption="Uploaded Image", use_container_width=True)
+
+    with col2:
+        st.subheader("🔍 Diagnostic Results")
+        
+        # Display the full condition name without truncation
+        st.markdown(f"### Detected Condition:")
+        st.markdown(f"#### <span style='color:#FF4B4B'>{clean_label}</span>" if "healthy" not in clean_label.lower() else f"#### <span style='color:#00CC96'>{clean_label}</span>", unsafe_allow_html=True)
+        
+        st.markdown(f"**Confidence Score: {confidence_score:.2f}%**")
+        st.progress(float(confidence.item()))
+        
+        if "healthy" in clean_label.lower():
+            st.success("Great news! The plant appears to be healthy. 🌱")
+        else:
+            st.error(f"Attention! The plant shows signs of **{clean_label}**. ⚠️")
